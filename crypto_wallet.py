@@ -9,6 +9,7 @@
 # Imports
 import os
 import requests
+import math
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -33,7 +34,7 @@ def generate_account():
     private, public = wallet.derive_account("eth")
 
     # Convert private key into an Ethereum account
-    account = Account.privateKeyToAccount(private)
+    account = Account.from_key(private)
 
     return account
 
@@ -44,7 +45,7 @@ def get_balance(w3, address):
     wei_balance = w3.eth.get_balance(address)
 
     # Convert Wei value to ether
-    ether = w3.fromWei(wei_balance, "ether")
+    ether = w3.from_wei(wei_balance, "ether")
 
     # Return the value in ether
     return ether
@@ -53,13 +54,16 @@ def get_balance(w3, address):
 def send_transaction(w3, account, to, wage):
     """Send an authorized transaction to the Ganache blockchain."""
     # Set gas price strategy
-    w3.eth.setGasPriceStrategy(medium_gas_price_strategy)
+    w3.eth.set_gas_price_strategy(medium_gas_price_strategy)
 
     # Convert eth amount to Wei
-    value = w3.toWei(wage, "ether")
+    value = w3.to_wei(wage, "ether")
+
+    block = w3.eth.get_block('latest')
+    next_gas_price = math.ceil(block.get('baseFeePerGas') * 1.251)
 
     # Calculate gas estimate
-    gasEstimate = w3.eth.estimateGas(
+    gasEstimate = w3.eth.estimate_gas(
         {"to": to, "from": account.address, "value": value}
     )
 
@@ -69,12 +73,13 @@ def send_transaction(w3, account, to, wage):
         "from": account.address,
         "value": value,
         "gas": gasEstimate,
-        "gasPrice": 0,
-        "nonce": w3.eth.getTransactionCount(account.address),
+        "maxFeePerGas": 2000000000,
+        "maxPriorityFeePerGas": 2000000000,
+        # "gasPrice": 0,
+        "nonce": w3.eth.get_transaction_count(account.address),
     }
-
     # Sign the raw transaction with ethereum account
     signed_tx = account.signTransaction(raw_tx)
 
     # Send the signed transactions
-    return w3.eth.sendRawTransaction(signed_tx.rawTransaction)
+    return w3.eth.send_raw_transaction(signed_tx.rawTransaction)
